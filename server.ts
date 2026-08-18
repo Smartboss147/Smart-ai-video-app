@@ -13,7 +13,74 @@ dotenv.config();
 // Validate configuration on startup
 validateConfig();
 
+
 const app = express();
+
+import { handleUpload } from '@vercel/blob/client';
+
+app.post('/api/videos/upload-token', async (request, response) => {
+  try {
+    const jsonResponse = await handleUpload({
+      body: request.body,
+      request,
+      onBeforeGenerateToken: async (pathname) => {
+        return {
+          allowedContentTypes: ['video/mp4', 'video/quicktime', 'video/webm'],
+          tokenPayload: JSON.stringify({
+            // Optional metadata
+          }),
+        };
+      },
+      onUploadCompleted: async ({ blob, tokenPayload }) => {
+        console.log("Blob upload completed", blob.url);
+      },
+    });
+
+    return response.status(200).json(jsonResponse);
+  } catch (error) {
+    return response.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/projects/create-from-blob', async (req, res) => {
+  try {
+    const { videoUrl, filename, size } = req.body;
+    
+    // Create project record directly with cloud URL
+    const newProject = {
+      id: `proj_${Date.now()}`,
+      userId: 'mock-user-1',
+      title: filename,
+      originalFilename: filename,
+      originalVideoUrl: videoUrl,
+      thumbnailUrl: '',
+      metadata: {
+        format: 'unknown',
+        container: 'unknown',
+        duration: 15,
+        resolution: "1920x1080",
+        fps: 30,
+        aspectRatio: "16:9",
+        audioPresent: true
+      },
+      versions: [],
+      currentVersionId: '',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    // Save to our mock DB
+    const db = readDB();
+    db.projects.push(newProject);
+    writeDB(db);
+    
+    res.json({ success: true, project: newProject });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 const PORT = config.PORT;
 
 app.use(express.json({ limit: "50mb" }));
@@ -24,11 +91,13 @@ const uploadDir = path.join(process.cwd(), "uploads");
 const outputDir = path.join(process.cwd(), "outputs");
 const dataDir = path.join(process.cwd(), "data");
 
-[uploadDir, outputDir, dataDir].forEach((dir) => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-});
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  [uploadDir, outputDir, dataDir].forEach((dir) => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  });
+}
 
 // Multer storage setup
 const storage = multer.diskStorage({
@@ -807,4 +876,9 @@ async function startServer() {
   });
 }
 
-startServer();
+
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  startServer();
+}
+export default app;
+

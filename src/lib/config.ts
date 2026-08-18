@@ -5,7 +5,7 @@
 export const config = {
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   NODE_ENV: process.env.NODE_ENV || 'development',
-  PORT: parseInt(process.env.PORT || '3000', 10),
+  PORT: 3000,
 };
 
 /**

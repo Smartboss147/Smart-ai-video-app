@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { upload } from '@vercel/blob/client';
 import { Upload, Film, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface VideoUploaderProps {
