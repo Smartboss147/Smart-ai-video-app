@@ -55,6 +55,7 @@ export interface VideoVersion {
   versionNumber: number;
   title: string;
   videoUrl: string;
+  normalizedVideoUrl?: string; // Standardized version for browser preview/AI
   thumbnailUrl: string;
   prompt: string;
   enhancedPrompt?: string;
@@ -70,6 +71,7 @@ export interface Project {
   title: string;
   thumbnailUrl: string;
   originalVideoUrl: string;
+  normalizedVideoUrl?: string; // Normalized version of the original source
   originalFilename: string;
   metadata: VideoMetadata;
   versions: VideoVersion[];

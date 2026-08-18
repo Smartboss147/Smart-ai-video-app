@@ -149,7 +149,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onOpenStudio, token 
                 >
                   <div className="aspect-video relative overflow-hidden bg-slate-950">
                     <video
-                      src={currentVersion?.videoUrl || project.originalVideoUrl}
+                      src={currentVersion?.normalizedVideoUrl || currentVersion?.videoUrl || project.normalizedVideoUrl || project.originalVideoUrl}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       muted
                       loop

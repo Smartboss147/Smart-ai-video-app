@@ -246,7 +246,7 @@ export const Studio: React.FC<StudioProps> = ({ token, projectId, onBackToDashbo
 
             <label className="inline-flex items-center justify-center px-8 py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium text-sm shadow-lg shadow-indigo-600/30 cursor-pointer transition-all transform hover:-translate-y-0.5">
               <span>{uploading ? 'Uploading & Analyzing...' : 'Select Video File'}</span>
-              <input type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={handleFileUpload} disabled={uploading} />
+              <input type="file" accept="video/*" className="hidden" onChange={handleFileUpload} disabled={uploading} />
             </label>
           </div>
         </div>
@@ -287,11 +287,23 @@ export const Studio: React.FC<StudioProps> = ({ token, projectId, onBackToDashbo
                 <div className="aspect-video rounded-xl overflow-hidden bg-black border border-slate-800 relative shadow-lg">
                   <video
                     ref={originalVideoRef}
-                    src={project.originalVideoUrl}
+                    src={project.normalizedVideoUrl || project.originalVideoUrl}
                     className="w-full h-full object-contain"
                     onTimeUpdate={(e) => setCurrentTime((e.target as HTMLVideoElement).currentTime)}
                     onLoadedMetadata={(e) => setDuration((e.target as HTMLVideoElement).duration)}
+                    onError={(e) => {
+                      // Silently handle preview errors if the browser can't play it
+                      // This could happen if normalization is still in progress or failed
+                      console.warn("Original video preview error - possible format incompatibility");
+                    }}
                   />
+                  {(!project.normalizedVideoUrl && !project.originalVideoUrl.match(/\.(mp4|webm)$/i)) && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 p-4 text-center">
+                      <p className="text-[10px] text-slate-400">
+                        Browser cannot preview this format directly.<br/>Creating compatible preview...
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -306,7 +318,7 @@ export const Studio: React.FC<StudioProps> = ({ token, projectId, onBackToDashbo
                 <div className="aspect-video rounded-xl overflow-hidden bg-black border border-indigo-500/40 relative shadow-2xl">
                   <video
                     ref={generatedVideoRef}
-                    src={currentVersion?.videoUrl}
+                    src={currentVersion?.normalizedVideoUrl || currentVersion?.videoUrl}
                     className="w-full h-full object-contain"
                   />
                 </div>

@@ -10,6 +10,7 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({ token, onUploadSuc
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState<string>('Uploading video...');
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -40,22 +41,24 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({ token, onUploadSuc
   };
 
   const processAndUploadFile = async (file: File) => {
-    // Validate file type
-    const validTypes = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-m4v'];
-    if (!validTypes.includes(file.type) && !file.name.match(/\.(mp4|mov|webm|m4v)$/i)) {
-      setError('Unsupported video format. Please upload MP4, MOV, or WebM.');
+    // Basic frontend validation - just check if it claims to be a video or has a video-like extension
+    const isLikelyVideo = file.type.startsWith('video/') || file.name.match(/\.(mp4|mov|webm|avi|mkv|mpeg|mpg|m4v|3gp|3g2|wmv|flv|ogv|ts|mts|m2ts)$/i);
+    
+    if (!isLikelyVideo) {
+      setError('This file does not appear to be a supported video format. Please select a video file.');
       return;
     }
 
-    // Validate size (500MB max)
-    if (file.size > 500 * 1024 * 1024) {
-      setError('File size exceeds 500MB limit.');
+    // Validate size (1GB max for universal support)
+    if (file.size > 1024 * 1024 * 1024) {
+      setError('File size exceeds 1GB limit. Please upload a smaller video.');
       return;
     }
 
     setError(null);
     setUploading(true);
-    setProgress(10);
+    setUploadStatus('Uploading video...');
+    setProgress(5);
 
     const formData = new FormData();
     formData.append('video', file);
@@ -63,8 +66,19 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({ token, onUploadSuc
     try {
       // Simulate smooth progress increments during upload
       const interval = setInterval(() => {
-        setProgress((prev) => (prev < 90 ? prev + 15 : prev));
-      }, 300);
+        setProgress((prev) => {
+          if (prev < 60) return prev + 5;
+          if (prev < 85) {
+            setUploadStatus('Analyzing video format and structure...');
+            return prev + 2;
+          }
+          if (prev < 95) {
+            setUploadStatus('Preparing compatible preview...');
+            return prev + 1;
+          }
+          return prev;
+        });
+      }, 400);
 
       const res = await fetch('/api/videos/upload', {
         method: 'POST',
@@ -76,18 +90,19 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({ token, onUploadSuc
 
       clearInterval(interval);
       setProgress(100);
+      setUploadStatus('Processing complete!');
 
       const data = await res.json();
       if (res.ok && data.project) {
         setTimeout(() => {
           onUploadSuccess(data.project);
-        }, 500);
+        }, 800);
       } else {
-        setError(data.error || 'Upload failed');
+        setError(data.error || 'Upload failed. Please try another video file.');
         setUploading(false);
       }
     } catch (err: any) {
-      setError(err.message || 'Network error during upload');
+      setError(err.message || 'Network error during upload. Please check your connection.');
       setUploading(false);
     }
   };
@@ -99,9 +114,9 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({ token, onUploadSuc
           <Upload className="w-8 h-8" />
         </div>
 
-        <h2 className="text-2xl font-bold text-white">Upload a Video to Begin</h2>
+        <h2 className="text-2xl font-bold text-white">Add Video</h2>
         <p className="text-sm text-slate-400 mt-2 mb-8">
-          Drag and drop your video file here, or click to browse. Supports MP4, MOV, and WebM up to 500MB.
+          Upload a video in any supported format. We’ll automatically prepare it for editing.
         </p>
 
         {error && (
@@ -115,26 +130,28 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({ token, onUploadSuc
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-2xl p-8 cursor-pointer transition-all ${
+          onClick={() => !uploading && fileInputRef.current?.click()}
+          className={`border-2 border-dashed rounded-2xl p-8 transition-all ${
+            uploading ? 'cursor-wait' : 'cursor-pointer hover:border-slate-700 hover:bg-slate-950/50'
+          } ${
             isDragging
               ? 'border-indigo-500 bg-indigo-500/10'
-              : 'border-slate-800 hover:border-slate-700 bg-slate-950/50'
+              : 'border-slate-800 bg-slate-950/50'
           }`}
         >
           {uploading ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between text-xs text-slate-300 font-medium">
-                <span>Uploading and analyzing video...</span>
+                <span>{uploadStatus}</span>
                 <span>{progress}%</span>
               </div>
               <div className="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden border border-slate-800">
                 <div
-                  className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full transition-all duration-300"
+                  className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full transition-all duration-500 ease-out"
                   style={{ width: `${progress}%` }}
                 ></div>
               </div>
-              <p className="text-xs text-slate-500">Securely uploading to AetherCut cloud storage</p>
+              <p className="text-xs text-slate-500">Do not close this window while we prepare your studio</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -148,7 +165,7 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({ token, onUploadSuc
         <input
           ref={fileInputRef}
           type="file"
-          accept="video/mp4,video/quicktime,video/webm,video/x-m4v"
+          accept="video/*"
           className="hidden"
           onChange={handleFileSelect}
         />

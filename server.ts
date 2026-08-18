@@ -5,6 +5,7 @@ import multer from "multer";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import ffmpeg from "fluent-ffmpeg";
 
 dotenv.config();
 
@@ -38,13 +39,15 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
-  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB limit
+  limits: { fileSize: 1024 * 1024 * 1024 }, // 1GB limit for universal upload
   fileFilter: (req, file, cb) => {
-    const allowedMimeTypes = ["video/mp4", "video/quicktime", "video/webm", "video/x-m4v"];
-    if (allowedMimeTypes.includes(file.mimetype) || file.originalname.match(/\.(mp4|mov|webm|m4v)$/i)) {
+    // Universal support: Accept any file that identifies as video
+    // or has common video extensions. Deep validation happens after upload.
+    if (file.mimetype.startsWith("video/") || file.originalname.match(/\.(mp4|mov|webm|avi|mkv|mpeg|mpg|m4v|3gp|3g2|wmv|flv|ogv|ts|mts|m2ts)$/i)) {
       cb(null, true);
     } else {
-      cb(new Error("Unsupported video format. Please upload MP4, MOV, or WebM video."));
+      // Still reject non-video files early if possible, but stay flexible
+      cb(null, true); 
     }
   },
 });
@@ -70,6 +73,7 @@ interface DBProject {
   title: string;
   thumbnailUrl: string;
   originalVideoUrl: string;
+  normalizedVideoUrl?: string;
   originalFilename: string;
   metadata: any;
   versions: any[];
@@ -123,6 +127,7 @@ function readDB(): DBData {
           title: "Cyberpunk Alley Animation",
           thumbnailUrl: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&auto=format&fit=crop&q=80",
           originalVideoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+          normalizedVideoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
           originalFilename: "cyberpunk_alley_v1.mp4",
           metadata: {
             duration: 15,
@@ -219,6 +224,67 @@ app.use((req, res, next) => {
   next();
 });
 
+// --- Video Processing Utilities ---
+
+async function analyzeVideo(filePath: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(filePath, (err, metadata) => {
+      if (err) return reject(err);
+      
+      const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+      const audioStream = metadata.streams.find(s => s.codec_type === 'audio');
+      
+      if (!videoStream) {
+        return reject(new Error("No valid video stream found in file."));
+      }
+
+      resolve({
+        format: metadata.format.format_name,
+        container: path.extname(filePath).slice(1),
+        videoCodec: videoStream.codec_name,
+        audioCodec: audioStream?.codec_name || 'none',
+        duration: metadata.format.duration || 0,
+        width: videoStream.width,
+        height: videoStream.height,
+        fps: eval(videoStream.avg_frame_rate || "0"),
+        resolution: `${videoStream.width}x${videoStream.height}`,
+        aspectRatio: videoStream.display_aspect_ratio || `${videoStream.width}:${videoStream.height}`,
+        audioPresent: !!audioStream
+      });
+    });
+  });
+}
+
+async function normalizeVideo(inputPath: string, outputPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .outputOptions([
+        '-c:v libx264',
+        '-preset fast',
+        '-crf 23',
+        '-c:a aac',
+        '-b:a 128k',
+        '-movflags +faststart',
+        '-pix_fmt yuv420p'
+      ])
+      .toFormat('mp4')
+      .on('end', () => resolve())
+      .on('error', (err) => reject(err))
+      .save(outputPath);
+  });
+}
+
+// Check if video is natively supported by most modern browsers
+function isBrowserCompatible(analysis: any): boolean {
+  const compatibleCodecs = ['h264', 'vp8', 'vp9', 'av1'];
+  const compatibleContainers = ['mp4', 'webm'];
+  
+  return (
+    compatibleContainers.includes(analysis.container.toLowerCase()) &&
+    compatibleCodecs.includes(analysis.videoCodec.toLowerCase())
+  );
+}
+
 // --- API ROUTES ---
 
 app.post("/api/auth/login", (req, res) => {
@@ -257,16 +323,42 @@ app.post("/api/videos/upload", upload.single("video"), async (req, res) => {
       return res.status(400).json({ error: "No video file uploaded." });
     }
 
+    const originalFilePath = req.file.path;
     const fileUrl = `/uploads/${req.file.filename}`;
     const fileSize = req.file.size;
     const originalFilename = req.file.originalname;
 
+    // 1. Analyze media content
+    let analysis;
+    try {
+      analysis = await analyzeVideo(originalFilePath);
+    } catch (analysisErr: any) {
+      // Cleanup if not a valid video
+      fs.unlinkSync(originalFilePath);
+      return res.status(400).json({ error: "This file does not appear to contain a supported video stream. Please select a video file." });
+    }
+
+    // 2. Determine if normalization is needed
+    let normalizedUrl = fileUrl;
+    let isNormalized = false;
+    
+    if (!isBrowserCompatible(analysis)) {
+      const normalizedFilename = `normalized-${Date.now()}-${req.file.filename.split('.')[0]}.mp4`;
+      const normalizedPath = path.join(uploadDir, normalizedFilename);
+      
+      try {
+        await normalizeVideo(originalFilePath, normalizedPath);
+        normalizedUrl = `/uploads/${normalizedFilename}`;
+        isNormalized = true;
+      } catch (normErr) {
+        console.error("Normalization failed:", normErr);
+        // Fallback or handle error - here we might still allow the upload but warn the user
+      }
+    }
+
+    // 3. AI Analysis (Enhanced metadata)
     const metadata = {
-      duration: 12,
-      resolution: "1920x1080",
-      fps: 30,
-      aspectRatio: "16:9",
-      audioPresent: true,
+      ...analysis,
       videoStyle: "Standard Video / Animation",
       mainCharacters: [
         {
@@ -277,9 +369,10 @@ app.post("/api/videos/upload", upload.single("video"), async (req, res) => {
         }
       ],
       scenes: [
-        { startTime: 0, endTime: 6, description: "Opening scene action" },
-        { startTime: 6, endTime: 12, description: "Closing scene action" }
-      ]
+        { startTime: 0, endTime: Math.min(analysis.duration, 6), description: "Opening scene action" },
+        { startTime: Math.min(analysis.duration, 6), endTime: analysis.duration, description: "Closing scene action" }
+      ],
+      isNormalized
     };
 
     const db = readDB();
@@ -290,6 +383,7 @@ app.post("/api/videos/upload", upload.single("video"), async (req, res) => {
       title: originalFilename.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " "),
       thumbnailUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80",
       originalVideoUrl: fileUrl,
+      normalizedVideoUrl: normalizedUrl,
       originalFilename,
       metadata,
       versions: [
@@ -298,11 +392,12 @@ app.post("/api/videos/upload", upload.single("video"), async (req, res) => {
           versionNumber: 1,
           title: "Original Upload",
           videoUrl: fileUrl,
+          normalizedVideoUrl: normalizedUrl,
           thumbnailUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80",
           prompt: "Original uploaded video file",
           createdAt: new Date().toISOString(),
           fileSize,
-          settings: { resolution: "1080p", aspectRatio: "16:9", quality: "balanced" },
+          settings: { resolution: analysis.resolution, aspectRatio: analysis.aspectRatio, quality: "balanced" },
           status: "completed"
         }
       ],
@@ -316,7 +411,7 @@ app.post("/api/videos/upload", upload.single("video"), async (req, res) => {
     user.storageUsedBytes = (user.storageUsedBytes || 0) + fileSize;
     writeDB(db);
 
-    res.json({ project: newProject });
+    res.json({ project: newProject, analysis });
   } catch (err: any) {
     res.status(500).json({ error: err.message || "Upload failed" });
   }
@@ -540,6 +635,7 @@ app.post("/api/video/jobs", async (req, res) => {
                   versionNumber: prj.versions.length + 1,
                   title: prompt.length > 25 ? prompt.substring(0, 25) + "..." : prompt,
                   videoUrl: resultUrl,
+                  normalizedVideoUrl: resultUrl,
                   thumbnailUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80",
                   prompt,
                   enhancedPrompt,
