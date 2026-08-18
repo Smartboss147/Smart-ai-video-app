@@ -412,7 +412,7 @@ app.post("/api/videos/upload", upload.single("video"), async (req, res) => {
     const newProject: DBProject = {
       id: projectId,
       userId: user.id,
-      title: originalFilename.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " "),
+      title: (originalFilename.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ").trim()) || "Untitled Video",
       thumbnailUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80",
       originalVideoUrl: fileUrl,
       normalizedVideoUrl: normalizedUrl,

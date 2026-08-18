@@ -104,7 +104,10 @@ export const Studio: React.FC<StudioProps> = ({ token, projectId, onBackToDashbo
     try {
       setUploading(true);
       const formData = new FormData();
-      formData.append('video', file);
+      // Fix Safari DOMException: "The string did not match the expected pattern"
+      // Safari crashes when fetching FormData with non-ASCII filenames
+      const safeFilename = file.name.replace(/[^\x20-\x7E]/g, '').trim() || 'upload.mp4';
+      formData.append('video', file, safeFilename);
 
       const res = await fetch('/api/videos/upload', {
         method: 'POST',
