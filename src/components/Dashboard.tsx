@@ -20,7 +20,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onOpenStudio, token 
   const fetchProjects = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/projects', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/projects`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -40,7 +40,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onOpenStudio, token 
     e.stopPropagation();
     if (!confirm('Are you sure you want to delete this project?')) return;
     try {
-      const res = await fetch(`/api/projects/${id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/projects/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });

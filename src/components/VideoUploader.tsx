@@ -89,7 +89,7 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({ token, onUploadSuc
         });
       }, 400);
 
-      const res = await fetch('/api/videos/upload', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/videos/upload`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${safeToken}`

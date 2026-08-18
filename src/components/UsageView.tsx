@@ -18,7 +18,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ user, token, onUserUpdate 
 
   const fetchUsage = async () => {
     try {
-      const res = await fetch('/api/usage', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/usage`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -35,7 +35,7 @@ export const UsageView: React.FC<UsageViewProps> = ({ user, token, onUserUpdate 
 
   const handleTopUp = async (amount: number) => {
     try {
-      const res = await fetch('/api/credits/topup', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/credits/topup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
