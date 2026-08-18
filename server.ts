@@ -16,6 +16,11 @@ validateConfig();
 
 const app = express();
 
+const PORT = config.PORT;
+
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+
 import { handleUpload } from '@vercel/blob/client';
 
 app.post('/api/videos/upload-token', async (request, response) => {
@@ -80,11 +85,6 @@ app.post('/api/projects/create-from-blob', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
-const PORT = config.PORT;
-
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // Ensure upload and output and data directories exist
 const uploadDir = path.join(process.cwd(), "uploads");
