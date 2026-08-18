@@ -90,12 +90,27 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({ token, onUploadSuc
         });
       }, 400);
 
-      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/videos/upload`, {
+      // 1. Upload directly to Vercel Blob from the client
+      setUploadStatus('Uploading to cloud storage...');
+      const blob = await upload(safeFilename, file, {
+        access: 'public',
+        handleUploadUrl: `${import.meta.env.VITE_API_URL || ''}/api/videos/upload-token`,
+        multipart: true, // handles large files safely on Vercel
+      });
+
+      // 2. Register the uploaded file with our backend
+      setUploadStatus('Creating project...');
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/projects/create-from-blob`, {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           Authorization: `Bearer ${safeToken}`
         },
-        body: formData
+        body: JSON.stringify({
+          videoUrl: blob.url,
+          filename: safeFilename,
+          size: file.size
+        })
       });
 
       clearInterval(interval);
