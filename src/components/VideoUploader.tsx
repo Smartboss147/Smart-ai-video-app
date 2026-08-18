@@ -61,10 +61,14 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({ token, onUploadSuc
     setProgress(5);
 
     const formData = new FormData();
-    // Fix Safari DOMException: "The string did not match the expected pattern"
-    // Safari crashes when fetching FormData with non-ASCII filenames
-    const safeFilename = file.name.replace(/[^\x20-\x7E]/g, '').trim() || 'upload.mp4';
-    formData.append('video', file, safeFilename);
+    const safeFilename = (file.name || 'upload.mp4').replace(/[^\x20-\x7E]/g, '').trim() || 'upload.mp4';
+    const safeToken = token.replace(/[^\x20-\x7E]/g, '').trim();
+
+    console.log("[UPLOAD_VIEW] Safe filename:", safeFilename);
+
+    // Safari Fix: Convert iOS File object to a raw Blob to strip buggy WebKit File metadata 
+    const safeBlob = new Blob([file], { type: file.type || 'video/mp4' });
+    formData.append('video', safeBlob, safeFilename);
 
     try {
       // Simulate smooth progress increments during upload
@@ -86,7 +90,7 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({ token, onUploadSuc
       const res = await fetch('/api/videos/upload', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${safeToken}`
         },
         body: formData
       });
@@ -101,12 +105,15 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({ token, onUploadSuc
           onUploadSuccess(data.project);
         }, 800);
       } else {
-        setError(data.error || 'Upload failed. Please try another video file.');
+        setError(`Server Error: ${data.error || 'Upload failed'}`);
         setUploading(false);
       }
     } catch (err: any) {
-      setError(err.message || 'Network error during upload. Please check your connection.');
+      console.error("[UPLOAD_VIEW] Exception:", err);
+      setError(`Exception: ${err?.name || 'Error'} - ${err?.message}`);
       setUploading(false);
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 

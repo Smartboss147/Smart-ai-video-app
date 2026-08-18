@@ -103,17 +103,30 @@ export const Studio: React.FC<StudioProps> = ({ token, projectId, onBackToDashbo
 
     try {
       setUploading(true);
+      
+      console.log("[UPLOAD] File selected:", { name: file.name, type: file.type, size: file.size });
+
       const formData = new FormData();
-      // Fix Safari DOMException: "The string did not match the expected pattern"
-      // Safari crashes when fetching FormData with non-ASCII filenames
-      const safeFilename = file.name.replace(/[^\x20-\x7E]/g, '').trim() || 'upload.mp4';
-      formData.append('video', file, safeFilename);
+      const safeFilename = (file.name || 'upload.mp4').replace(/[^\x20-\x7E]/g, '').trim() || 'upload.mp4';
+      const safeToken = token.replace(/[^\x20-\x7E]/g, '').trim();
+      
+      console.log("[UPLOAD] Safe filename:", safeFilename);
+
+      // Safari Fix: Convert iOS File object to a raw Blob to strip buggy WebKit File metadata 
+      // that causes "The string did not match the expected pattern" during fetch serialization.
+      const safeBlob = new Blob([file], { type: file.type || 'video/mp4' });
+      formData.append('video', safeBlob, safeFilename);
+
+      console.log("[UPLOAD] Executing fetch /api/videos/upload");
 
       const res = await fetch('/api/videos/upload', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${safeToken}` },
         body: formData
       });
+
+      console.log("[UPLOAD] Fetch response received");
+
       const data = await res.json();
       if (res.ok && data.project) {
         setProject(data.project);
@@ -121,9 +134,11 @@ export const Studio: React.FC<StudioProps> = ({ token, projectId, onBackToDashbo
         alert(data.error || 'Upload failed');
       }
     } catch (e: any) {
-      alert(e.message || 'Upload failed');
+      console.error("[UPLOAD] Exception:", e);
+      alert(`Upload Exception: ${e?.name || 'Error'}\nMessage: ${e?.message}\nStack: ${e?.stack ? e.stack.substring(0, 300) : 'N/A'}`);
     } finally {
       setUploading(false);
+      e.target.value = ''; // Reset input so same file can be chosen again
     }
   };
 
