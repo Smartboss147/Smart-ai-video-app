@@ -28,7 +28,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
           <div>
             <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-              AetherCut
+              Smart
             </span>
             <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 font-medium border border-indigo-500/30">
               AI Studio

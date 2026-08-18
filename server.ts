@@ -107,8 +107,8 @@ function readDB(): DBData {
       users: [
         {
           id: "user_default_1",
-          email: "creator@aethercut.ai",
-          name: "Aether Creator",
+          email: "creator@smartai.studio",
+          name: "Smart Creator",
           credits: 150,
           storageUsedBytes: 1024 * 1024 * 25,
           storageLimitBytes: 1024 * 1024 * 1024 * 10,
@@ -228,8 +228,8 @@ app.post("/api/auth/login", (req, res) => {
   if (!user) {
     user = {
       id: `user_${Date.now()}`,
-      email: email || "user@aethercut.ai",
-      name: email ? email.split("@")[0] : "Aether User",
+      email: email || "user@smartai.studio",
+      name: email ? email.split("@")[0] : "Smart User",
       credits: 100,
       storageUsedBytes: 0,
       storageLimitBytes: 1024 * 1024 * 1024 * 10,
@@ -636,7 +636,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`AetherCut Server running on http://localhost:${PORT}`);
+    console.log(`Smart AI Studio Server running on http://localhost:${PORT}`);
   });
 }
 

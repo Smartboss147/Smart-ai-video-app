@@ -119,7 +119,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onExplor
 
       {/* Footer */}
       <footer className="border-t border-slate-900 py-12 text-center text-xs text-slate-500">
-        <p>© {new Date().getFullYear()} AetherCut AI Studio. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} Smart AI Studio. All rights reserved.</p>
       </footer>
     </div>
   );
