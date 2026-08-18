@@ -49,9 +49,11 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({ token, onUploadSuc
       return;
     }
 
-    // Validate size (1GB max for universal support)
-    if (file.size > 1024 * 1024 * 1024) {
-      setError('File size exceeds 1GB limit. Please upload a smaller video.');
+    // Validate size for Vercel Serverless Function Limits (4.5MB)
+    const MAX_FILE_SIZE = 4.5 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      setError('File is too large for the current serverless environment (max 4.5MB). Please upload a smaller video.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
@@ -99,7 +101,22 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({ token, onUploadSuc
       setProgress(100);
       setUploadStatus('Processing complete!');
 
-      const data = await res.json();
+      // Safe JSON Parsing Fix
+      let data;
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const textResponse = await res.text();
+        console.error("[UPLOAD_VIEW] Non-JSON response:", textResponse.substring(0, 200));
+        
+        if (res.status === 413) {
+          throw new Error("File is too large for the server to process. Please upload a smaller video (under 4.5MB).");
+        } else {
+          throw new Error(`Server returned an invalid response (Status ${res.status}). Please try again later.`);
+        }
+      }
+
       if (res.ok && data.project) {
         setTimeout(() => {
           onUploadSuccess(data.project);

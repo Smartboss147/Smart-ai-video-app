@@ -101,6 +101,14 @@ export const Studio: React.FC<StudioProps> = ({ token, projectId, onBackToDashbo
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Vercel Serverless Function Limit (4.5MB)
+    const MAX_FILE_SIZE = 4.5 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      alert("Validation Error: File is too large for the current serverless environment (max 4.5MB). Please upload a smaller video.");
+      e.target.value = '';
+      return;
+    }
+
     try {
       setUploading(true);
       
@@ -125,9 +133,26 @@ export const Studio: React.FC<StudioProps> = ({ token, projectId, onBackToDashbo
         body: formData
       });
 
-      console.log("[UPLOAD] Fetch response received");
+      console.log("[UPLOAD] Fetch response received, status:", res.status);
 
-      const data = await res.json();
+      // Safe JSON Parsing Fix
+      // Vercel 413 Payload Too Large returns an HTML page, which crashes Safari's JSON.parse
+      // with "SyntaxError: The string did not match the expected pattern."
+      let data;
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const textResponse = await res.text();
+        console.error("[UPLOAD] Non-JSON response:", textResponse.substring(0, 200));
+        
+        if (res.status === 413) {
+          throw new Error("File is too large for the server to process. Please upload a smaller video (under 4.5MB).");
+        } else {
+          throw new Error(`Server returned an invalid response (Status ${res.status}). Please try again later.`);
+        }
+      }
+
       if (res.ok && data.project) {
         setProject(data.project);
       } else {
