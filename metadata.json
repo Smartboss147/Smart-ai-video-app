@@ -1,0 +1,6 @@
+{
+  "name": "AetherCut AI Video Studio",
+  "description": "Production-ready, modern AI-powered web application for transforming and editing uploaded videos using natural-language prompts, video analysis, hybrid processing, and advanced provider architecture.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
