@@ -30,7 +30,7 @@ app.post('/api/videos/upload-token', async (request, response) => {
       request,
       onBeforeGenerateToken: async (pathname) => {
         return {
-          allowedContentTypes: ['video/mp4', 'video/quicktime', 'video/webm'],
+          allowedContentTypes: ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo', 'video/x-matroska', 'video/mpeg'],
           tokenPayload: JSON.stringify({
             // Optional metadata
           }),
