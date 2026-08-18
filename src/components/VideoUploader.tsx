@@ -92,15 +92,25 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({ token, onUploadSuc
 
       // 1. Upload directly to Vercel Blob from the client
       setUploadStatus('Uploading to cloud storage...');
+      
+      // Defensively handle misconfigured VITE_API_URL in production environments
+      let baseUrl = import.meta.env.VITE_API_URL || '';
+      if (baseUrl && baseUrl.includes('localhost') && window.location.hostname !== 'localhost') {
+        console.warn("[UPLOAD_VIEW] Ignoring localhost VITE_API_URL in production environment. Using relative paths.");
+        baseUrl = ''; 
+      }
+      const handleUrl = baseUrl ? `${baseUrl.replace(/\/$/, '')}/api/videos/upload-token` : '/api/videos/upload-token';
+      const createProjectUrl = baseUrl ? `${baseUrl.replace(/\/$/, '')}/api/projects/create-from-blob` : '/api/projects/create-from-blob';
+
       const blob = await upload(safeFilename, file, {
         access: 'public',
-        handleUploadUrl: `${import.meta.env.VITE_API_URL || ''}/api/videos/upload-token`,
+        handleUploadUrl: handleUrl,
         multipart: true, // handles large files safely on Vercel
       });
 
       // 2. Register the uploaded file with our backend
       setUploadStatus('Creating project...');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/projects/create-from-blob`, {
+      const res = await fetch(createProjectUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

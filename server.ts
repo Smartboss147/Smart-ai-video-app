@@ -25,10 +25,17 @@ import { handleUpload } from '@vercel/blob/client';
 
 app.post('/api/videos/upload-token', async (request, response) => {
   try {
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      console.error("[UPLOAD TOKEN] Missing BLOB_READ_WRITE_TOKEN environment variable!");
+      return response.status(500).json({ error: "Server is missing Vercel Blob configuration." });
+    }
+
     const jsonResponse = await handleUpload({
       body: request.body,
       request,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
       onBeforeGenerateToken: async (pathname) => {
+        console.log("[UPLOAD TOKEN] Generating token for:", pathname);
         return {
           allowedContentTypes: ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo', 'video/x-matroska', 'video/mpeg'],
           tokenPayload: JSON.stringify({
@@ -37,13 +44,14 @@ app.post('/api/videos/upload-token', async (request, response) => {
         };
       },
       onUploadCompleted: async ({ blob, tokenPayload }) => {
-        console.log("Blob upload completed", blob.url);
+        console.log("[UPLOAD TOKEN] Blob upload completed", blob.url);
       },
     });
 
     return response.status(200).json(jsonResponse);
-  } catch (error) {
-    return response.status(400).json({ error: error.message });
+  } catch (error: any) {
+    console.error("[UPLOAD TOKEN] Error generating token:", error);
+    return response.status(400).json({ error: error.message || "Failed to generate upload token" });
   }
 });
 
@@ -51,10 +59,13 @@ app.post('/api/projects/create-from-blob', async (req, res) => {
   try {
     const { videoUrl, filename, size } = req.body;
     
+    const authHeader = req.headers.authorization;
+    const userId = authHeader ? authHeader.split(" ")[1] : 'mock-user-1';
+
     // Create project record directly with cloud URL
     const newProject = {
       id: `proj_${Date.now()}`,
-      userId: 'mock-user-1',
+      userId: userId,
       title: filename,
       originalFilename: filename,
       originalVideoUrl: videoUrl,
