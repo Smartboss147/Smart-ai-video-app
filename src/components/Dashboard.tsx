@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PlusCircle, Film, Trash2, Download, ExternalLink, Sparkles, Clock, FolderOpen, AlertCircle } from 'lucide-react';
+import { PlusCircle, Film, Trash2, Download, ExternalLink, Sparkles, Clock, FolderOpen, AlertCircle, Play } from 'lucide-react';
 import { Project, User } from '../types';
 
 interface DashboardProps {
@@ -148,18 +148,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onOpenStudio, token 
                   className="group rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-indigo-500/50 transition-all overflow-hidden cursor-pointer shadow-lg flex flex-col"
                 >
                   <div className="aspect-video relative overflow-hidden bg-slate-950">
-                    <video
-                      src={currentVersion?.normalizedVideoUrl || currentVersion?.videoUrl || project.normalizedVideoUrl || project.originalVideoUrl}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      muted
-                      loop
-                      onMouseEnter={(e) => (e.target as HTMLVideoElement).play().catch(() => {})}
-                      onMouseLeave={(e) => {
-                        const v = e.target as HTMLVideoElement;
-                        v.pause();
-                        v.currentTime = 0;
-                      }}
-                    />
+                    {(currentVersion?.videoUrl || project.originalVideoUrl) ? (
+                      <video
+                        src={currentVersion?.normalizedVideoUrl || currentVersion?.videoUrl || project.normalizedVideoUrl || project.originalVideoUrl}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        muted
+                        loop
+                        playsInline
+                        onMouseEnter={(e) => (e.target as HTMLVideoElement).play().catch(() => {})}
+                        onMouseLeave={(e) => {
+                          const v = e.target as HTMLVideoElement;
+                          v.pause();
+                          v.currentTime = 0;
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Play className="w-8 h-8 text-slate-800" />
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
                     <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700 text-xs font-medium text-slate-300">
                       v{currentVersion?.versionNumber || 1} ({project.versions.length} versions)

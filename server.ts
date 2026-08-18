@@ -6,11 +6,15 @@ import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import ffmpeg from "fluent-ffmpeg";
+import { config, validateConfig } from "./src/lib/config";
 
 dotenv.config();
 
+// Validate configuration on startup
+validateConfig();
+
 const app = express();
-const PORT = 3000;
+const PORT = config.PORT;
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
@@ -209,6 +213,20 @@ function writeDB(data: DBData) {
 }
 
 // Simple authentication middleware simulator
+// --- Middleware & Safety Guards ---
+
+const requireConfig = (key: keyof typeof config) => {
+  return (req: any, res: any, next: any) => {
+    if (!config[key]) {
+      return res.status(503).json({
+        error: "Configuration Missing",
+        details: `The server is missing the required '${key}' environment variable. Please configure it in your platform settings.`
+      });
+    }
+    next();
+  };
+};
+
 app.use((req, res, next) => {
   const authHeader = req.headers.authorization;
   let userId = "user_default_1";
@@ -333,16 +351,30 @@ app.post("/api/videos/upload", upload.single("video"), async (req, res) => {
     try {
       analysis = await analyzeVideo(originalFilePath);
     } catch (analysisErr: any) {
-      // Cleanup if not a valid video
-      fs.unlinkSync(originalFilePath);
-      return res.status(400).json({ error: "This file does not appear to contain a supported video stream. Please select a video file." });
+      console.warn("FFprobe failed, falling back to default metadata:", analysisErr);
+      // If FFprobe fails (e.g. on Vercel), we provide a fallback instead of rejecting
+      analysis = {
+        format: path.extname(originalFilename).slice(1),
+        container: path.extname(originalFilename).slice(1),
+        videoCodec: "unknown",
+        audioCodec: "unknown",
+        duration: 15,
+        width: 1920,
+        height: 1080,
+        fps: 30,
+        resolution: "1920x1080",
+        aspectRatio: "16:9",
+        audioPresent: true
+      };
     }
 
     // 2. Determine if normalization is needed
     let normalizedUrl = fileUrl;
     let isNormalized = false;
     
-    if (!isBrowserCompatible(analysis)) {
+    // Only attempt normalization if analysis succeeded enough to check compatibility
+    // AND if ffmpeg is likely available. 
+    if (analysis.videoCodec !== "unknown" && !isBrowserCompatible(analysis)) {
       const normalizedFilename = `normalized-${Date.now()}-${req.file.filename.split('.')[0]}.mp4`;
       const normalizedPath = path.join(uploadDir, normalizedFilename);
       
@@ -351,8 +383,8 @@ app.post("/api/videos/upload", upload.single("video"), async (req, res) => {
         normalizedUrl = `/uploads/${normalizedFilename}`;
         isNormalized = true;
       } catch (normErr) {
-        console.error("Normalization failed:", normErr);
-        // Fallback or handle error - here we might still allow the upload but warn the user
+        console.error("Normalization failed (is ffmpeg installed?):", normErr);
+        // On failure, we stay with the original URL so the project still loads
       }
     }
 
@@ -417,10 +449,10 @@ app.post("/api/videos/upload", upload.single("video"), async (req, res) => {
   }
 });
 
-app.post("/api/videos/analyze", async (req, res) => {
+app.post("/api/videos/analyze", requireConfig('GEMINI_API_KEY'), async (req, res) => {
   try {
     const { videoUrl } = req.body;
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = config.GEMINI_API_KEY!;
 
     if (apiKey) {
       try {
@@ -483,10 +515,10 @@ app.post("/api/videos/analyze", async (req, res) => {
   }
 });
 
-app.post("/api/prompts/enhance", async (req, res) => {
+app.post("/api/prompts/enhance", requireConfig('GEMINI_API_KEY'), async (req, res) => {
   try {
     const { prompt } = req.body;
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = config.GEMINI_API_KEY!;
 
     if (apiKey && prompt) {
       const ai = new GoogleGenAI({ apiKey });
@@ -535,7 +567,7 @@ app.delete("/api/projects/:id", (req, res) => {
   res.json({ success: true });
 });
 
-app.post("/api/video/jobs", async (req, res) => {
+app.post("/api/video/jobs", requireConfig('GEMINI_API_KEY'), async (req, res) => {
   try {
     const user = (req as any).user;
     const { projectId, prompt, enhancedPrompt, settings } = req.body;
@@ -717,7 +749,7 @@ app.use("/uploads", express.static(uploadDir));
 app.use("/outputs", express.static(outputDir));
 
 async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
+  if (config.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
