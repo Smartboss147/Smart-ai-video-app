@@ -70,7 +70,7 @@ app.post('/api/projects/create-from-blob', async (req, res) => {
       },
       versions: [],
       currentVersionId: '',
-      status: 'active',
+      status: 'active' as const,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -625,6 +625,12 @@ app.get("/api/projects/:id", (req, res) => {
   res.json({ project });
 });
 
+app.get("/api/projects/:id/jobs", (req, res) => {
+  const db = readDB();
+  const jobs = (db.jobs || []).filter((j) => j.projectId === req.params.id);
+  res.json({ jobs });
+});
+
 app.delete("/api/projects/:id", (req, res) => {
   const db = readDB();
   const idx = db.projects.findIndex((p) => p.id === req.params.id);
@@ -820,18 +826,29 @@ app.use("/uploads", express.static(uploadDir));
 
 app.post("/api/projects/:id/plan", requireConfig('GEMINI_API_KEY'), async (req, res) => {
   try {
-    const { prompt } = req.body;
-    // In production, we'd use src/lib/prompt-interpreter
+    const { prompt, segment } = req.body;
+    const preserveList = ["story", "scene_order", "timing", "audio"];
+    const modifyList: any[] = [
+      {
+        target: "visual_style",
+        property: "style",
+        operation: "style_transform",
+        value: prompt
+      }
+    ];
+
+    if (segment && (segment.startTime > 0 || segment.endTime > 0)) {
+      modifyList.push({
+        target: "segment_cut",
+        property: "time_range",
+        operation: "modify",
+        value: `${segment.startTime.toFixed(2)}s to ${segment.endTime.toFixed(2)}s (${segment.duration?.toFixed(2) || (segment.endTime - segment.startTime).toFixed(2)}s segment duration)`
+      });
+    }
+
     const editPlan = {
-      preserve: ["story", "scene_order", "timing", "audio"],
-      modify: [
-        {
-          target: "visual_style",
-          property: "style",
-          operation: "style_transform",
-          value: prompt
-        }
-      ]
+      preserve: preserveList,
+      modify: modifyList
     };
     res.json({ success: true, editPlan });
   } catch (error: any) {
