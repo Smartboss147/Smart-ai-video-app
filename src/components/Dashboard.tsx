@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PlusCircle, Film, Trash2, Download, ExternalLink, Sparkles, Clock, FolderOpen, AlertCircle, Play } from 'lucide-react';
 import { Project, User } from '../types';
+import { StorageVisualization } from './StorageVisualization';
 
 interface DashboardProps {
   user: User;
@@ -92,14 +93,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onOpenStudio, token 
           </div>
           <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-slate-400">Storage Used</p>
+              <p className="text-xs font-medium text-slate-400">Storage Usage</p>
               <p className="text-2xl font-bold text-white mt-1">
                 {(user.storageUsedBytes / (1024 * 1024)).toFixed(1)} MB
               </p>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-              <FolderOpen className="w-5 h-5" />
-            </div>
+            <StorageVisualization used={user.storageUsedBytes} limit={user.storageLimitBytes} />
           </div>
           <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
             <div>

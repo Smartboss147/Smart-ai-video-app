@@ -653,6 +653,35 @@ app.delete("/api/projects/:id", (req, res) => {
   res.json({ success: true });
 });
 
+app.post("/api/projects", (req, res) => {
+  const user = (req as any).user;
+  const { title } = req.body;
+  const db = readDB();
+  const newProject: DBProject = {
+    id: `proj_${Date.now()}`,
+    userId: user.id,
+    title: title || "Untitled Project",
+    thumbnailUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80",
+    originalVideoUrl: "",
+    originalFilename: "",
+    metadata: {
+      duration: 0,
+      resolution: "1920x1080",
+      fps: 30,
+      aspectRatio: "16:9",
+      audioPresent: false,
+    },
+    versions: [],
+    currentVersionId: "",
+    status: "active",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  db.projects.unshift(newProject);
+  writeDB(db);
+  res.json({ project: newProject });
+});
+
 app.post("/api/video/jobs", requireConfig('GEMINI_API_KEY'), async (req, res) => {
   try {
     const user = (req as any).user;

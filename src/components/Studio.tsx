@@ -30,6 +30,7 @@ import { Timeline } from './Timeline';
 import { VideoUploader } from './VideoUploader';
 import { VideoPreview } from './VideoPreview';
 import { StatusIndicator } from './StatusIndicator';
+import { DropZone } from './DropZone';
 
 interface StudioProps {
   projectId?: string | null;
